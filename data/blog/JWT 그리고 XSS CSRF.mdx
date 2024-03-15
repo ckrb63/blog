@@ -1,0 +1,104 @@
+---
+title: 'JWT 토큰 저장 위치와 XSS, CSRF'
+date: '2023-07-11'
+tags: ['웹', '보안']
+draft: false
+summary: 'JWT를 어디에 저장하느냐에 따라 아주 기초적인 공격 유형에도 취약해질 수 있다'
+images: ['/static/images/blog/XSS.png']
+---
+
+![XSS](/static/images/blog/XSS.png)
+
+웹 개발을 하다 보면 사용자 인증 방식으로 자주 쓰이는 JWT(JSON Web Tokens)에 대해 고민하게 됩니다. 특히, JWT를 어디에 저장할지는 개발자에게 중요한 결정 중 하나입니다. 대표적으로 고려되는 저장소는 로컬 스토리지, 쿠키, 그리고 메모리입니다. 
+
+## 왜 이러한 고민이 필요할까요?
+
+JWT는 Stateless한 구조를 가지고 있어, 서버는 토큰이 유효하다면 요청도 유효하다고 판단합니다. 이는 토큰이 탈취되면 사용자의 신분으로 할 수 있는 모든 것을 탈취자가 할 수 있다는 것을 의미합니다. 따라서, 어디에 토큰을 저장하느냐는 보안의 관점에서 매우 중요한 문제가 됩니다.
+
+## 주요 공격 유형: XSS와 CSRF
+
+이 두 유형은 웹 애플리케이션에서 가장 흔하고 위험한 공격이므로, 토큰 저장소를 결정할 때 고려해야할 가장 중요한 요소입니다.
+
+### XSS(Cross-Site-Scripting)
+
+XSS 공격은 공격자가 클라이언트 측에 악성 스크립트를 삽입하여 실행시키는 방식입니다. 이 공격의 주 목적은 주로 사용자의 권한이나 토큰을 탈취하는 데 있으며, 사용자가 어떤 사이트를 신뢰한다는 점을 악용합니다. 만약 토큰이 스크립트로 접근 가능한 곳에 저장되어 있다면, 그 토큰은 XSS 공격의 위험에 노출됩니다. HTML5는 innerHTML을 통해 삽입된 코드의 실행을 방지하지만, 스크립트가 어떤 방식으로든 실행되면, httpOnly 속성이 설정되지 않은 쿠키나 로컬 스토리지에 저장된 정보는 공격자에 의해 탈취될 수 있습니다.
+
+### CSRF(Cross-Site Request Forgery)
+
+CSRF공격은 인증된 사용자가 본인의 의사와 관계없이 공격자가 조작한 요청을 서버에 보내게 하는 방식입니다. 이 공격은 토큰 자체를 탈취하지 않아도, 사용자의 쿠키에 저장된 인증 토큰이 요청과 함께 자동으로 서버로 전송되므로, 서버는 이를 합법적인 사용자의 요청으로 오인할 수 있습니다. 따라서, CSRF 공격은 사용자 정보를 직접 탈취하기 보다는, 사용자를 속여 특정 행동을 강제로 실행시키려는 목적으로 주로 사용됩니다.
+
+### 둘의 차이
+
+XSS와 CSRF는 둘 다 사용자의 브라우저를 통해 공격이 이루어진다는 점에서 유사하지만, 공격 방식과 목적에서 차이가 있습니다. XSS 공격은 사용자가 신뢰하는 웹사이트에 악성 스크립트를 삽입하여 실행시키는 것으로, 공격자는 이를 통해 사용자의 세션 토큰을 탈취하거나 사기 행위를 시도할 수 있습니다. 반면, CSRF 공격은 웹 애플리케이션의 보안 취약점을 이용해, 사용자가 자신의 의지와 무관하게 공격자가 의도한 행동(예: 비밀번호 변경, 이메일 주소 변경 등)을 실행하도록 만듭니다. CSRF는 사용자의 인증 토큰을 직접 탈취하지 않고도, 이미 인증된 사용자 세션을 이용해 공격할 수 있다는 점에서 XSS와 구분됩니다.
+
+## 토큰 저장소 후보
+XSS와 CSRF를 고려하며 어떤 저장소에 토큰을 저장할지 후보를 정해봅시다.
+### 로컬 스토리지
+
+스크립트 한 줄이면 로컬 스토리지에 있는 토큰을 탈취할 수 있습니다.
+→ XSS에 취약하다.
+
+### 쿠키
+httpOnly 플래그를 통해 스크립트로 쿠키를 읽지 못하게 할 수 있습니다. 다만 스크립트로 쿠키에 있는 토큰을 탈취하지 못하더라도 같은 사이트에서 요청을 어떻게든 보내면, 공격자가 요청 url을 안다면, 요청이 위조될 수 있다는 뜻입니다.
+→ CSRF에 취약하다
+
+### 메모리(변수)
+XSS 및 CSRF 공격에 비교적 안전하지만, 사용자가 페이지를 새로고침할 때마다 토큰이 사라지는 UX 문제가 있습니다.
+→ 안전하지만, UX 개선 필요
+
+## Refresh Token의 역할
+메모리에 Access Token을 저장하고, Refresh Token을 사용해 Access Token을 재발급 받는 방식은 보안과 사용자 경험(UX) 사이의 균형을 맞추는 좋은 방법입니다. 사용자는 만료기간이 매우 긴 Refresh Token이 만료될 때만 다시 로그인하면 됩니다.
+
+### Refresh Token도 결국 안전하게 보관되어야 한다면 똑같은거 아닐까요?
+
+Refresh Token의 핵심은 받아온 Access Token은 변수에 저장해서 혹시 Refresh Token이 탈취 혹은 요청이 위조되더라도 공격자가 Access Token을 사용할 수 없다는 것에 있습니다.
+
+Refresh Token은 쿠키에 저장하고 httpOnly, secure=true, sameSite=strict 플래그를 사용해 CSRF를 최대한 방지할 수 있습니다.
+
+> Access Token과 Refresh Token을 전부 로컬 스토리지 혹은 쿠키에 저장하는건, Token을 한개만 쓰는거랑 똑같습니다. 왜냐면 Refresh Token의 사용은 Access Token을 메모리에 저장할 때 발생하는 UX 저하를 개선하기 위해 고려된 방법이기 때문입니다.
+> 
+
+## 프론트엔드에서의 활용 예
+
+프론트엔드 개발에서는 axios와 같은 HTTP 클라이언트 라이브러리를 사용하여 인증 헤더에 Access Token을 설정하고, Interceptor를 통해 401(Unauthorized) 응답을 감지하여 Refresh Token으로 Access Token을 재발급 받는 로직을 구현할 수 있습니다. 이렇게 하면 사용자는 토큰이 만료될 때까지 로그인 상태를 유지할 수 있으며, 보안성도 강화할 수 있습니다.
+
+1. 로그인 시 axios Instance를 만들고 헤더에 Access Token을 저장합니다.(메모리 저장)
+
+```jsx
+const RedirectPage = () => {
+	// Get Access Token from Redirect Url Query Params
+  const location = useLocation(); 
+  const navigate = useNavigate();
+  const queryParmas = new URLSearchParams(location.search);
+  const accessToken = queryParmas.get('accessToken');
+
+  useEffect(() => {
+    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+    // Login API request, Context dispatch
+    navigate(HOME);
+  }, [accessToken]);
+
+  return <div />;
+};
+```
+
+2. axios Interceptor를 통해 api 응답이 401일 때 Refresh Token으로 Access Token을 재발급하는 API를 요청합니다.
+
+```jsx
+axiosInstance.interceptors.response.use(
+  (error) => {
+    if (error.response) {
+      if (error.response.status === 401) {
+        refreshToken();
+        return {
+          code: '401',
+          message: '401',
+        };
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
+3. 재발급에 실패하면(Refresh Token 만료) 인증이 만료된 것으로 간주하고 로그인 화면으로 이동합니다.

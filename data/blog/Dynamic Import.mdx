@@ -1,0 +1,117 @@
+---
+title: '모듈 청크를 분리해서 필요한 시점에 가져오기'
+date: '2023-11-14'
+tags: ['성능최적화', 'Vite']
+summary: 'Code Splitting'
+---
+
+일반적으로 Javascript 코드를 작성할 때 코드 최상단에 import로 모든 모듈을 가져옵니다. 이는 빌드 시점에 모듈 번들러에 의해 의존성 트리에 포함되고 트리에 있는 모든 모듈을 포함하는 하나의 번들 파일이 생성됩니다.
+그러므로 어플리케이션의 크기가 커질 수록, 특정 기능에서 필요한 모듈을 사용하기도 전에 전부 불러오다보니 번들의 크기가 계속 커지고 브라우저가 이를 내려받는 시간은 길어집니다. 
+다행이도 Vite나 Next.js를 사용하면 이런 문제를 비교적 쉽게 해결할 수 있습니다. 이 글은 Vite를 기준으로 모듈을 나눠서 불러오는 방법에 대해 다룹니다.
+
+## 라이브러리 코드 스플리팅
+Vite에서는 config파일의 rollupOptions를 조금 수정하면 쉽게 외부 라이브러리에 대한 청크를 분리할 수 있습니다. 해당 라이브러리가 사용될 때 청크 파일을 불러오고 그 후로는 캐싱하여 사용합니다.
+```ts
+const renderChunks = (deps: Record<string, string>) => {
+  const chunks: Chunks = {};
+  Object.keys(deps).forEach((key) => {
+    if (['react', 'react-router-dom', 'react-dom'].includes(key)) {
+      return;
+    }
+    chunks[key] = [key];
+  });
+
+  return chunks;
+};
+
+const dependencies = {
+  '@hookform/resolvers': '@hookform/resolvers',
+  '@tanstack/react-query': '@tanstack/react-query',
+  '@tanstack/react-query-devtools': '@tanstack/react-query-devtools',
+  'airbridge-web-sdk-loader': 'airbridge-web-sdk-loader',
+  axios: 'axios',
+  exceljs: 'exceljs',
+  zustand: 'zustand',
+  ...
+};
+
+export default defineConfig({
+  build: {
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-router-dom', 'react-dom', 'react-router', 'react-router-dom'],
+          ...renderChunks(dependencies),
+        },
+      },
+    },
+  },
+```
+
+- `vendor` 청크에 명시된 라이브러리들(react, react-router-dom, react-dom)은 애플리케이션에서 공통으로 사용되는 핵심 의존성들로 분류되어, 이들을 별도의 청크로 분리하여 관리합니다. 
+- `renderChunks` 함수는 나머지 의존성들에 대해 각각 독립된 청크를 생성합니다. 이 청크들은 비동기 청크로 분류될 수 있으며, 이는 사용자의 액션에 따라 필요할 때만 로드될 수 있는 코드 블록입니다.
+
+### 거의 모든 페이지에서 바로 로드해야하는 라이브러리
+사실 zustand같은 전역 상태관리 라이브러리의 경우에는 거의 모든 페이지에서 사용되고 있습니다. 이러한 경우에는 vendor 청크에 포함시켜 항상 로드되도록 하는 것이 HTTP 요청의 횟수를 줄일 수 있기 때문에 유리할 수 있다고 생각합니다.
+
+## 라우트 레벨 코드 스플리팅
+리액트에서 기본적으로 제공하는 `lazy`를 사용하여 라우트에서 페이지 컴포넌트를 동적으로 import할 수 있습니다. `Suspense`와 `fallback`을 사용해 로딩처리를 해줍시다.
+```ts
+import { Suspense, lazy } from 'react';
+
+const LandingPage = lazy(() => import('./LandingPage'));
+const RefreshPage = lazy(() => import('./RefreshPage'));
+const RedirectPage = lazy(() => import('./LoginPage/RedirectPage.tsx'));
+const LoginPage = lazy(() => import('./LoginPage'));
+const RegisterPage = lazy(() => import('./RegisterPage'));
+const EnterWard = lazy(() => import('./RegisterPage/EnterWard'));
+const RegisterWard = lazy(() => import('./RegisterPage/RegisterWard'));
+const MakeShiftPage = lazy(() => import('./MakeShiftPage'));
+const RequestShiftPage = lazy(() => import('./RequestShiftPage'));
+const MemberPage = lazy(() => import('./MemberPage'));
+const ProfilePage = lazy(() => import('./ProfilePage'));
+
+export const Router = () => {
+  return (
+    <Suspense fallback={<div></div>}>
+      <Routes>
+        <Route path={ROUTE.ROOT} element={<LandingPage />} />
+        <Route path={ROUTE.REFRESH} element={<RefreshPage />} />
+        {/* 인증된 사용자가 접근할 수 없는 페이지 */}
+        <Route element={<NotAuthzLayout />}>
+          <Route path={ROUTE.REDIRECT} element={<RedirectPage />} />
+          <Route path={ROUTE.LOGIN} element={<LoginPage />} />
+        </Route>
+        {/* 인증되지 않은 사용자가 접근할 수 없는 페이지 */}
+        <Route element={<AuthzLayout />}>
+          <Route path={ROUTE.REGISTER} element={<RegisterPage />} />
+          <Route path={ROUTE.ENTER_WARD} element={<EnterWard />} />
+          <Route path={ROUTE.REGISTER_WARD} element={<RegisterWard />} />
+          <Route element={<MainLayout />}>
+            <Route path={ROUTE.MAKE} element={<MakeShiftPage />} />
+            <Route path={ROUTE.REQUEST} element={<RequestShiftPage />} />
+            <Route path={ROUTE.MEMBER} element={<MemberPage />} />
+            <Route path={ROUTE.PROFILE} element={<ProfilePage />} />
+          </Route>
+        </Route>
+      </Routes>
+    </Suspense>
+  );
+};
+
+```
+
+## 특정 기능 코드 스플리팅
+유틸리티 함수를 만들어 놓거나 할때, 외부 라이브러리를 사용하는 경우도 있습니다. 이 경우, 라우트 레벨에서 코드 스플리팅을 했어도 라우트를 통해 렌더링되는 페이지가 아니기 때문에 메인 번들에 포함됩니다. 이런 경우에는 해당 파일 상단에서 import를 하는 것이 아니라, 함수 내부에서 import 하여 사용해야 합니다.
+```ts
+export const shiftToExcel = async (month: number, shift: Shift) => {
+  const Excel = await import('exceljs');
+
+  const flatRows = shift.divisionShiftNurses.flatMap((row) => row);
+  ...
+```
+
+## 결과
+코드 스플리팅 결과 하나의 거대한 번들이 오는것이 아니라 index, vendor, 각 모듈들이 분리되어 로드되는 것을 볼 수 있습니다.
+![](https://velog.velcdn.com/images/cksrb63/post/0527571e-68b4-43f1-9746-ccfd3bf50c5d/image.png)
