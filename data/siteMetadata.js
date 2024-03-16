@@ -2,18 +2,18 @@
 const siteMetadata = {
   title: '김찬규',
   author: '김찬규',
-  headerTitle: '김찬규.md',
-  description: '',
+  headerTitle: '김찬규.dev',
+  description: '배우고, 탐구하며, 느낀 것들을 공유하는 블로그',
   language: 'kr',
-  theme: 'system', // system, dark or light
-  siteUrl: 'https://bengineer.dev',
+  theme: 'light', // system, dark or light
+  siteUrl: 'https://kimchankyu.dev',
   siteRepo: 'https://github.com/timlrx/tailwind-nextjs-starter-blog',
   siteLogo: '/static/images/logo.png',
   socialBanner: '/static/images/twitter-card.png',
   mastodon: 'https://mastodon.social/@mastodonuser',
   email: 'cksr1@naver.com',
-  github: 'https://github.com',
-  linkedin: 'https://www.linkedin.com',
+  github: 'https://github.com/ckrb63',
+  linkedin: 'https://www.linkedin.com/in/chankyu63/',
   locale: 'kr',
   analytics: {
     // If you want to use an analytics provider you have to add it to the
