@@ -1,0 +1,87 @@
+---
+title: '코드 스플리팅으로 번들링 최적화하기'
+date: '2023-11-14'
+tags: ['성능최적화', 'React']
+summary: '클라이언트 웹 어플리케이션은 기본적으로 프로젝트에 사용되는 모든 모듈을 하나의 번들 파일로 만들어서 빌드합니다. 특정 기능에 필요한 모듈을 사용하기도 전에 전부 불러오다보니 번들의 크기가 커지면 브라우저가 이를 내려받는 시간은 길어집니다. 이러한 문제는 어플리케이션의 크기가 커질 수록 부각됩니다.'
+---
+
+클라이언트 웹 어플리케이션은 기본적으로 프로젝트에 사용되는 모든 모듈을 하나의 번들 파일로 만들어서 빌드합니다.
+특정 기능에 필요한 모듈을 사용하기도 전에 전부 불러오다보니 번들의 크기가 커지면 브라우저가 이를 내려받는 시간은 길어집니다. 이러한 문제는 어플리케이션의 크기가 커질 수록 부각됩니다.
+
+최신 번들러 및 프레임워크들은 이런 문제를 비교적 쉽게 해결하는 방법을 제공하고 있습니다.
+
+## 라이브러리 코드 스플리팅
+
+### Vite(Rollup)
+Vite에서는 `Rollup`을 통해 번들링합니다. `vite.config.ts`파일의 `build.rollupOptions.output.manualChunks`를 사용해 청크를 분할하는 방식을 구성할 수 있습니다. 해당 라이브러리가 사용될 때 청크 파일을 불러오고 그 후로는 캐싱하여 사용합니다.
+
+```ts
+const dependencies = { state: ["zustand"] };
+
+export default defineConfig({
+  build: {
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          ...dependencies,
+        },
+      },
+    },
+  },
+  plugins: [react()],
+});
+
+```
+- `vendor` 청크에 명시된 라이브러리들(`react`, `react-router-dom`, `react-dom`)은 애플리케이션에서 공통으로 사용되는 핵심 의존성들로 분류되어, 이들을 별도의 청크로 분리하여 관리합니다.
+- 나머지 라이브러리는 사용처별로 혹은 빈도별로 상황에 맞게 분리해서 관리합니다.
+![](https://velog.velcdn.com/images/cksrb63/post/39c05868-99d5-42fe-bf2e-6ccb2f7ef269/image.png)
+
+
+### Next.js(Webpack)
+Next.js는 `Webpack`을 기반으로 한 자동 코드 스플리팅을 제공하지만 `next.config.js`파일에서 `webpack`설정을 수정하여 특정 라이브러리나 모듈을 별도의 청크로 명시적으로 분리할 수 있습니다.
+```js
+module.exports = {
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.optimization.splitChunks.cacheGroups = {
+        ...config.optimization.splitChunks.cacheGroups,
+        commons: {
+          test: /[\\/]node_modules[\\/](react|react-dom|react-router-dom)[\\/]/,
+          name: "commons",
+          chunks: "all",
+        },
+      };
+    }
+    return config;
+  },
+};
+```
+- 위의 예제에서는 `react`, `react-router-dom`, `react-dom`을 애플리케이션에서 공통으로 사용되는 핵심 의존성들로 분류되어, `commons`라는 이름의 청크로 분리하여 관리합니다.
+
+### 거의 모든 페이지에서 바로 로드해야하는 라이브러리
+
+`tailwind`같은 스타일링 라이브러리의 경우에는 거의 모든 페이지에서 사용되고 있습니다. 이러한 경우에는 코드 스플리팅의 효과를 기대하기 어렵습니다. 차라리 공통 vendor 청크에 포함시켜 항상 로드되도록 하는 것이 HTTP 요청의 횟수를 줄일 수 있기 때문에 유리할 수 있습니다.
+
+## 라우트 레벨 코드 스플리팅
+```ts
+import { Suspense, lazy } from 'react';
+
+const LoginPage = lazy(() => import('./LoginPage'));
+const HomePage = lazy(() => import('./HomePage'));
+
+export const Router = () => {
+  return (
+    <Suspense fallback={<div></div>}>
+      <Routes>
+        <Route path={'/'} element={<HomePage />} />
+```
+리액트에서 기본적으로 제공하는 `lazy`를 사용하여 라우트에서 페이지 컴포넌트를 동적으로 import할 수 있습니다. `Suspense`와 `fallback`을 사용해 로딩처리를 해줍시다.
+
+## 주의할점
+너무 많은 청크로 분리하면 HTTP의 요청 수가 증가하여 성능이 오히려 저하될 수 있습니다. 매우 큰 단하나의 청크 혹은 너무 작고 수가 많은 청크가 아니라, 청크의 크기와 수 사이에 균형이 맞는 적절한 크기의 청크 여러개가 이상적입니다.
+![](https://velog.velcdn.com/images/cksrb63/post/36602edb-2e16-4176-9272-ffb1a32114b0/image.png)
+특히 `HTTP/1.1` 환경에서는 `HTTP/2`만큼 다수의 요청을 효율적으로 관리하지 못하기 때문에 청크 분리 수준을 더욱 고려해야 합니다.
+
+Next.js는 기본적으로 이미 효율적인 코드 스플리팅 전략을 제공하기 때문에, `@next/bundle-analyzer`와 같은 플러그인을 사용하여 청크 사이즈와 구조를 분석하고, 최적화할 수 있는 부분이 명확할 때만 `wepback`설정을 수정해야 합니다. Vite도 마찬가지로 `vite-plugin-visualizer`로 청크 사이즈와 구조를 분석할 수 있습니다.

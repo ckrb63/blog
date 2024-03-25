@@ -1,0 +1,314 @@
+---
+title: 달력 스케쥴 배치 테트리스 구현하기
+date: '2023-09-10'
+tags: ['React', 'Web']
+draft: false
+summary: 웹 캐시를 잘 다루면 성능이 좋아지고, 유저가 옛날 화면을 안본다.
+---
+
+달력을 직접 구현할 때 생각보다 고려해야할 부분이 많았습니다. 그중에 특히 스케쥴이 하루 이상 이어질 때, UI에 표현하는 방식이 까다로웠습니다.
+
+예를 들어 아래와 같은 UI를 구현한다고 했을 때, 각 스케쥴은 빈 공간을 찾아 가장 효율적으로 배치되어야 합니다. 한 날짜에 최대 4개의 스케쥴만 표시되기 때문에 만약 빈 공간을 찾지 않고 적당히 배치한다면, 사용자는 스케쥴을 한눈에 확인할 수 없고 일일히 더보기를 눌러야 됩니다.
+
+![](https://velog.velcdn.com/images/cksrb63/post/e53be95d-85f2-4c09-ac2b-b2adc34ab95b/image.png)
+
+해결해야할 문제는 다음과 같습니다.
+
+1. 시작하는 날짜에만 스케쥴 이름이 표시되어야 합니다.
+2. 끝나는 날짜의 스케쥴은 다음 스케쥴과 분리되어야 합니다.
+3. 빈 공간이 가장 적은 스케쥴 배치를 해야 합니다.
+4. 스케쥴이 다른 주로 이어질 때 스케쥴 이름이 다시 표시되어야 합니다.
+5. 스케쥴이 다른 주로 이어질 때 원래 높이를 유지하는 것이 아니라, 다시 해당 주의 가장 적절한 위치에 배치되어야 합니다.
+6. 스케쥴이 다른 달로 이어질 때도 5, 6번이 해결되어야 합니다.
+
+## 스케쥴 가져오기
+
+## 시작하는 날짜에만 스케쥴 이름이 표시되게 하기
+
+디바이스 캘린더에서 스케쥴을 가져오면, 이어지는 스케쥴은 해당하는 모든 날짜에 대해서 전부 가져오게됩니다. 이때 event.startDate와 비교하여 같은 날짜만 스케쥴 컴포넌트를 렌더링합니다. 예를들어, 4일 기간의
+스케쥴을 모든 날짜에 똑같이 렌더링한다면, 한개의 스케쥴이 4일동안 이어지는지(2) 아니면 4개의 스케쥴(1)이 있는지 구분할 수 없습니다.
+![](https://velog.velcdn.com/images/cksrb63/post/8edb734f-1a06-45e3-9f4b-d16fd98f604c/image.png)
+(2)스케쥴처럼 렌더링되어야 합니다.
+
+이것을 효율적으로 구현하기 위해, 모든 스케쥴을 방문하다가 처음 시작하는 스케쥴을 만나면 해당 날짜를 기준으로 캘린더를 수정하고 스케쥴의 남은 날짜만큼 건너뜁니다.
+
+```ts
+events.forEach((event) => {
+  for (let i = index; i < index + jump; i++) {
+    const schedule: Schedule = {
+      ...event,
+      startTime: eventStartDate,
+      endTime: eventEndDate,
+      level,
+      color: color,
+      isStart:
+        eventStartDate.getMonth() === newCalendar[i].date.getMonth() &&
+        eventStartDate.getDate() === newCalendar[i].date.getDate(),
+      isEnd: eventEndDate.getDate() === newCalendar[i].date.getDate(),
+      leftDuration: endIndex - i,
+      editbale:
+        editableCalendar.find((calendar) => calendar.id === event.calendarId)
+          ?.allowsModifications || false,
+    }
+    const schedules = [...newCalendar[i].schedules]
+    schedules.push(schedule)
+  }
+  index = index + jump
+})
+```
+
+### 시작 날짜 컴포넌트 가로 길이보다 이름의 길이가 길어도 계속해서 표시되게하기
+
+스케쥴이 있는 모든 날짜에 스케쥴 컴포넌트를 렌더링하고, 시작하는 날짜에만 텍스트가 나오는 방식으로 렌더링하면 스케쥴 이름이 가로 범위를 넘어설 때 짤리게 됩니다.
+![](https://velog.velcdn.com/images/cksrb63/post/af4da795-8cdb-46c9-b5d8-59b7a297628e/image.png)
+![](https://velog.velcdn.com/images/cksrb63/post/0d6aecbd-c8ca-47d0-b07d-93b96d41ae34/image.png)
+이 문제를 해결하기 위해, 스케쥴의 기간 내 모든 날짜에 스케쥴 컴포넌트를 다르게 렌더링 하는 방식이 아니라 시작하는 날짜 기준 하루만 렌더링하고 가로 길이를 스케쥴의 길이만큼으로 설정해야합니다.
+
+```tsx
+  <View
+    key={schedule.id}
+    style={[
+      styles.scheduleView,
+      {
+        backgroundColor: hexToRgba(schedule.color, 0.3),
+        ...
+        width:
+          schedule.isStart ||
+          day.date.getDay() === 0 ||
+          (day.date.getMonth() === date.getMonth() &&
+            day.date.getDate() === 1)
+            ? `${(schedule.leftDuration+1) * 100}%`
+            : 0,
+      },
+    ]}
+  >
+```
+
+스케쥴 컴포넌트의 `width`에 `(leftDuration+1) * 100`%로 설정합니다.
+
+## 끝나는 스케쥴과 시작하는 스케쥴 분리하기
+
+위의 코드대로라면 끝나는 스케쥴과 시작하는 스케쥴 같은 날짜일 때, 마치 이어지는 것 처럼 보일 수도 있습니다.(위의 코드도 사진에서는 분리된 상태) 방지하기 위해 스케쥴의 마지막날은 `width`를 `100`이 아니라 `98`로 지정합니다.
+![](https://velog.velcdn.com/images/cksrb63/post/bd00ea61-2e23-4b7e-8a41-c56b4b410c4c/image.png)
+
+```diff
+  <View
+    key={schedule.id}
+    style={[
+      styles.scheduleView,
+      {
+        backgroundColor: hexToRgba(schedule.color, 0.3),
+        ...
+        width:
+          schedule.isStart ||
+          day.date.getDay() === 0 ||
+          (day.date.getMonth() === date.getMonth() &&
+            day.date.getDate() === 1)
+-            ? `${(schedule.leftDuration+1) * 100}%`
++            ? `${schedule.leftDuration * 98}%`
+            : 0,
+      },
+    ]}
+  >
+```
+
+## 빈 공간이 가장 적게 스케쥴 배치하기
+
+우선 스케쥴의 위치를 지정하기 위해서 각 스케쥴 객체에 `level`이라는 속성을 만들었습니다. 그리고 다음 스케쥴을 배치할 때 `level`이 채워진 곳은 배치할 수 없게 했습니다.
+
+```ts
+while (index <= endIndex) {
+  const occupiedLevels = new Set();
+  let jump = 0;
+  for (let i = index; i <= endIndex; i++) {
+    const schedules = newCalendar[i].schedules;
+    jump++;
+    schedules.forEach((schedule) => occupiedLevels.add(schedule.level));
+    if (newCalendar[i].date.getDay() == 6) break;
+  }
+  level = 1;
+  while (occupiedLevels.has(level)) {
+    level++;
+  }
+  ...
+}
+```
+
+### 스케쥴 길이로 내림차순 정렬하기
+
+스케쥴의 배치는 가장 길이가 긴 스케쥴부터 위에서부터 `level`을 차지했을 때 손해보지 않습니다.
+
+1. 수평 간격 최소화 : 스케쥴의 길이 순서로 위에서부터 채웠을 때, 큰 스케쥴이 차지할 수 있는 공간을 미리 확보하고, 이후 작은 스케쥴들로 남은 공간을 채운는 것이 수평 간격을 최소화 할 수 있습니다.
+2. 수직 간격 최소화 : 스케쥴의 길이 순서로 위에서부터 채웠을 때, 수평 공간이 없어서 아래로 밀리는 일이 발생하지 않습니다. 빈 공간에 큰 스케쥴이 들어가지 못한다면, 그 후에 작은 스케쥴의 차례가 왔을 때 그 공간에 들어갈 수 있는지 체크합니다. 이는 달력과 스케쥴 사이의 수직 간격을 최소화합니다.
+
+```ts
+events.sort(
+  (a, b) =>
+    dateDiffInDays(new Date(b.startDate), new Date(b.endDate)) -
+    dateDiffInDays(new Date(a.startDate), new Date(a.endDate))
+)
+```
+
+## 스케쥴이 다른 주로 이어질 때
+
+스케쥴이 다른 주로 이어질 때 이름이 앞에 이름이 나타나지 않는다면 어떤 스케쥴인지 인지하기 어렵습니다. 스케쥴이 `isStart`일 때뿐 아니라 일요일에도 텍스트를 렌더링합니다.
+
+```tsx
+{(schedule.isStart ||
+  day.date.getDay() === 0 && (
+  <Text numberOfLines={1} style={styles.scheduleText}>
+    {schedule.title}
+  </Text>
+)}
+```
+
+또한 새롭게 `level`을 계산하지 않으면 바뀐 주에서는 첫 시작하는 주에서 계산한 `level`이 최적이라고 볼 수 없습니다.
+![](https://velog.velcdn.com/images/cksrb63/post/c91b8c48-d491-4988-94b7-1071825c6481/image.png)
+
+```ts
+let jump = 0
+for (let i = index; i <= endIndex; i++) {
+  const schedules = newCalendar[i].schedules
+  jump++
+  schedules.forEach((schedule) => occupiedLevels.add(schedule.level))
+  if (newCalendar[i].date.getDay() == 6) break
+}
+```
+
+한 일정을 계산하고 다음 일정으로 건너뛰기 위한 `jump`변수를 계산할 때, 일요일을 넘어서지 않게 제한합니다.
+
+## 스케줄이 다른 달로 이어질 때
+
+스케줄이 다른달로 이동한다는 것은 `startDate`의 `getDate()`값이 `endDate`의 `getDate()`값 보다 클 수 있다는 의미입니다. 애초에 스케쥴을 가져오는 것도 `Month` 단위로 가져오고 있어 스케쥴의 `getDate()`값 끼리만 비교하고 있었습니다. 이 문제를 해결하기 위해 `startDate`와 `endDate`가 서로 다른 달일 때 특수한 처리가 필요합니다.
+
+```ts
+const adjustEventIndexForMonthTransition = (eventEndDate, eventStartDate, startIndex, endIndex) => {
+  if (eventEndDate.getMonth() > date.getMonth() || eventEndDate.getFullYear() > date.getFullYear())
+    endIndex += new Date(eventEndDate.getFullYear(), eventEndDate.getMonth(), 0).getDate()
+
+  if (
+    eventStartDate.getMonth() < date.getMonth() ||
+    eventStartDate.getFullYear() < date.getFullYear()
+  )
+    startIndex -= new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+}
+```
+
+## 전체코드
+```ts
+const getEventFromDevice = async () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const firstDayOfMonth = new Date(year, month, 1);
+  const lastDayOfMonth =
+    Platform.OS === 'android' ? new Date(year, month + 1, 10) : new Date(year, month + 1, 1);
+
+  const calendarIds = deviceCalendar
+    .filter((calendar) => calendarLinks[calendar.id])
+    .map((calendar) => calendar.id);
+
+  if (calendarIds.length === 0) return;
+
+  let events = await getEventsAsync(calendarIds, firstDayOfMonth, lastDayOfMonth);
+
+  if (Platform.OS === 'android') {
+    events = events.filter((event) => new Date(event.startDate).getMonth() === month);
+  }
+
+  const updatedCalendar = [...calendar];
+
+  if (isScheduleUpdated) {
+    updatedCalendar.forEach((date) => (date.schedules = []));
+  }
+
+  events = sortEventsByDuration(events);
+  populateCalendarWithEvents(events, updatedCalendar, firstDayOfMonth);
+  setState('calendar', updatedCalendar);
+};
+
+const sortEventsByDuration = (events) =>
+  events.sort(
+    (a, b) =>
+      dateDiffInDays(new Date(b.startDate), new Date(b.endDate)) -
+      dateDiffInDays(new Date(a.startDate), new Date(a.endDate)),
+  );
+
+const populateCalendarWithEvents = (events, updatedCalendar, firstDayOfMonth) => {
+  events.forEach((event) => {
+    const eventStartDate = new Date(event.startDate);
+    let eventEndDate = new Date(event.endDate);
+
+    if (event.allDay && Platform.OS === 'android') {
+      eventEndDate.setDate(eventEndDate.getDate() - 1);
+    }
+
+    let startIndex = firstDayOfMonth.getDay() + eventStartDate.getDate() - 1;
+    let endIndex = firstDayOfMonth.getDay() + eventEndDate.getDate() - 1;
+
+    adjustEventIndexForMonthTransition(eventEndDate, date, &startIndex, &endIndex, updatedCalendar);
+
+    for (let index = Math.max(0, startIndex); index <= endIndex;) {
+      index += addEventToCalendar(
+        event,
+        eventStartDate,
+        eventEndDate,
+        updatedCalendar,
+        index,
+        endIndex,
+      );
+    }
+  });
+};
+
+const adjustEventIndexForMonthTransition = (eventEndDate, eventStartDate, startIndex, endIndex) => {
+  if (
+  eventEndDate.getMonth() > date.getMonth() ||
+  eventEndDate.getFullYear() > date.getFullYear()
+  )
+    endIndex += new Date(eventEndDate.getFullYear(), eventEndDate.getMonth(), 0).getDate();
+
+  if (
+    eventStartDate.getMonth() < date.getMonth() ||
+    eventStartDate.getFullYear() < date.getFullYear()
+  )
+    startIndex -= new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    startIndex = Math.max(0, startIndex);
+    if (endIndex > newCalendar.length - 1) endIndex = newCalendar.length - 1;
+};
+
+const addEventToCalendar = (event, eventStartDate, eventEndDate, calendar, startIndex, endIndex) => {
+  const occupiedLevels = new Set();
+  let jump = 0;
+  for (let i = startIndex; i <= endIndex; i++) {
+    const schedules = newCalendar[i].schedules;
+    jump++;
+    schedules.forEach((schedule) => occupiedLevels.add(schedule.level));
+    if (newCalendar[i].date.getDay() == 6) break;
+  }
+  level = 1;
+  while (occupiedLevels.has(level)) {
+    level++;
+  }
+  for (let i = startIndex; i < startIndex + jump; i++) {
+    const schedule: Schedule = {
+      ...event,
+      startTime: eventStartDate,
+      endTime: eventEndDate,
+      level,
+      color: color,
+      isStart:
+        eventStartDate.getMonth() === newCalendar[i].date.getMonth() &&
+        eventStartDate.getDate() === newCalendar[i].date.getDate(),
+      isEnd: eventEndDate.getDate() === newCalendar[i].date.getDate(),
+      leftDuration: endIndex - i,
+      editbale:
+        editableCalendar.find((calendar) => calendar.id === event.calendarId)
+          ?.allowsModifications || false,
+    };
+    const schedules = [...newCalendar[i].schedules];
+    schedules.push(schedule);
+    newCalendar[i].schedules = schedules;
+  }
+};
+```
