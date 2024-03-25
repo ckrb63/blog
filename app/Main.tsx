@@ -1,18 +1,20 @@
 import Link from '@/components/Link'
 import Tag from '@/components/Tag'
 import siteMetadata from '@/data/siteMetadata'
+import { Blog } from 'contentlayer/generated'
+import { CoreContent } from 'pliny/utils/contentlayer'
 import { formatDate } from 'pliny/utils/formatDate'
 
 const MAX_DISPLAY = 5
 
-export default function Home({ posts }) {
+export default function Home({ posts }: { posts: CoreContent<Blog>[] }) {
   return (
     <>
       <div className="divide-y divide-gray-200 dark:divide-gray-700">
         <ul className="divide-y divide-gray-200 dark:divide-gray-700">
           {!posts.length && 'No posts found.'}
           {posts.slice(0, MAX_DISPLAY).map((post) => {
-            const { slug, date, title, summary, tags } = post
+            const { slug, date, title, summary, tags, readingTime } = post
             return (
               <li key={slug} className="py-12">
                 <article>
@@ -34,10 +36,13 @@ export default function Home({ posts }) {
                               {title}
                             </Link>
                           </h2>
-                          <div className="flex flex-wrap">
+                          <div className="flex flex-wrap items-center">
                             {tags.map((tag) => (
                               <Tag key={tag} text={tag} />
                             ))}
+                            <time className="text-xs leading-6 text-gray-500 dark:text-gray-400">
+                            {Math.max(Math.floor(readingTime.minutes- 1.5), 2)} min read
+                            </time>
                           </div>
                         </div>
                         <div className="prose max-w-none text-gray-500 dark:text-gray-400">
