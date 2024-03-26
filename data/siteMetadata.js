@@ -1,8 +1,8 @@
 /** @type {import("pliny/config").PlinyConfig } */
 const siteMetadata = {
-  title: '김찬규',
-  author: '김찬규',
-  headerTitle: '김찬규.dev',
+  title: 'KyuDev',
+  author: 'Kim Chan Kyu',
+  headerTitle: 'KyuDev',
   description: '배우고, 탐구하며, 느낀 것들을 공유하는 블로그',
   language: 'kr',
   theme: 'light', // system, dark or light

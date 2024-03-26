@@ -39,7 +39,7 @@ export default function PostLayout({ content, next, prev, children }: LayoutProp
                   <dt className="sr-only">Published on</dt>
                   <dd className="flex items-center justify-center text-base font-medium leading-6 text-gray-500 dark:text-gray-400">
                     <time dateTime={date}>
-                      {new Date(date).toLocaleDateString(siteMetadata.locale, postDateTemplate)}
+                      {new Date(date).toLocaleDateString('kr', postDateTemplate)}
                     </time>
                     <div className="mx-2">·</div>
                     <time className="text-sm font-normal">
