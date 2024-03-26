@@ -30,7 +30,7 @@ export default function PostLayout({ content, next, prev, children }: LayoutProp
                 <div>
                   <dt className="sr-only">Published on</dt>
                   <dd className="text-base font-medium leading-6 text-gray-500 dark:text-gray-400">
-                    <time dateTime={date}>{formatDate(date, 'kr')}</time>
+                    <time dateTime={date}>{formatDate(date, 'ko-KR')}</time>
                   </dd>
                 </div>
               </dl>

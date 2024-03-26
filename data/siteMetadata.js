@@ -4,7 +4,7 @@ const siteMetadata = {
   author: 'Kim Chan Kyu',
   headerTitle: 'KyuDev',
   description: '배우고, 탐구하며, 느낀 것들을 공유하는 블로그',
-  language: 'kr',
+  language: 'ko-KR',
   theme: 'light', // system, dark or light
   siteUrl: 'https://kimchankyu.dev',
   siteRepo: 'https://github.com/timlrx/tailwind-nextjs-starter-blog',
@@ -14,7 +14,7 @@ const siteMetadata = {
   email: 'cksr1@naver.com',
   github: 'https://github.com/ckrb63',
   linkedin: 'https://www.linkedin.com/in/chankyu63/',
-  locale: 'kr',
+  locale: 'ko-KR',
   analytics: {
     // If you want to use an analytics provider you have to add it to the
     // content security policy in the `next.config.js` file.
@@ -69,7 +69,7 @@ const siteMetadata = {
       // example: https://giscus.app/themes/custom_example.css
       themeURL: '',
       // This corresponds to the `data-lang="en"` in giscus's configurations
-      lang: 'kr',
+      lang: 'ko',
     },
   },
   search: {
