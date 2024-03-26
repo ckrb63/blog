@@ -37,13 +37,13 @@ export default function PostLayout({ content, next, prev, children }: LayoutProp
               <dl className="space-y-10">
                 <div>
                   <dt className="sr-only">Published on</dt>
-                  <dd className="flex justify-center items-center text-base font-medium leading-6 text-gray-500 dark:text-gray-400">
+                  <dd className="flex items-center justify-center text-base font-medium leading-6 text-gray-500 dark:text-gray-400">
                     <time dateTime={date}>
                       {new Date(date).toLocaleDateString(siteMetadata.locale, postDateTemplate)}
                     </time>
-                    <div className='mx-2'>·</div>
-                    <time className='text-sm font-normal'>
-                      {Math.max(Math.floor(readingTime.minutes- 1.5), 2)} min read
+                    <div className="mx-2">·</div>
+                    <time className="text-sm font-normal">
+                      {Math.max(Math.floor(readingTime.minutes / 2 + 2), 2)} min read
                     </time>
                   </dd>
                 </div>

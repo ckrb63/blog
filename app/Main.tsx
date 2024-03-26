@@ -41,7 +41,7 @@ export default function Home({ posts }: { posts: CoreContent<Blog>[] }) {
                               <Tag key={tag} text={tag} />
                             ))}
                             <time className="text-xs leading-6 text-gray-500 dark:text-gray-400">
-                            {Math.max(Math.floor(readingTime.minutes- 1.5), 2)} min read
+                              {Math.max(Math.floor(readingTime.minutes / 2 + 2), 2)} min read
                             </time>
                           </div>
                         </div>
