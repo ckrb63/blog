@@ -7,7 +7,7 @@ const siteMetadata = {
   language: 'ko-KR',
   theme: 'light', // system, dark or light
   siteUrl: 'https://kimchankyu.dev',
-  siteRepo: 'https://github.com/timlrx/tailwind-nextjs-starter-blog',
+  siteRepo: 'https://github.com/ckrb63/blog',
   siteLogo: '/static/images/logo.png',
   socialBanner: '/static/images/twitter-card.png',
   mastodon: 'https://mastodon.social/@mastodonuser',
