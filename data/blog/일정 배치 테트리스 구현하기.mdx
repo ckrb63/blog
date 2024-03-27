@@ -187,7 +187,7 @@ for (let i = index; i <= endIndex; i++) {
 스케줄이 다른달로 이동한다는 것은 `startDate`의 `getDate()`값이 `endDate`의 `getDate()`값 보다 클 수 있다는 의미입니다. 애초에 스케쥴을 가져오는 것도 `Month` 단위로 가져오고 있어 스케쥴의 `getDate()`값 끼리만 비교하고 있었습니다. 이 문제를 해결하기 위해 `startDate`와 `endDate`가 서로 다른 달일 때 특수한 처리가 필요합니다.
 
 ```ts
-const adjustEventIndexForMonthTransition = (eventEndDate, eventStartDate, startIndex, endIndex) => {
+const adjustEventIndex = (eventEndDate, eventStartDate, startIndex, endIndex) => {
   if (eventEndDate.getMonth() > date.getMonth() || eventEndDate.getFullYear() > date.getFullYear())
     endIndex += new Date(eventEndDate.getFullYear(), eventEndDate.getMonth(), 0).getDate()
 
@@ -262,7 +262,7 @@ const populateCalendarWithEvents = (events, updatedCalendar, firstDayOfMonth) =>
     let startIndex = firstDayOfMonth.getDay() + eventStartDate.getDate() - 1;
     let endIndex = firstDayOfMonth.getDay() + eventEndDate.getDate() - 1;
 
-    adjustEventIndexForMonthTransition(eventEndDate, date, &startIndex, &endIndex, updatedCalendar);
+    adjustEventIndex(eventEndDate, date, &startIndex, &endIndex, updatedCalendar);
 
     for (let index = Math.max(0, startIndex); index <= endIndex;) {
       index += addEventToCalendar(
@@ -277,7 +277,7 @@ const populateCalendarWithEvents = (events, updatedCalendar, firstDayOfMonth) =>
   });
 };
 
-const adjustEventIndexForMonthTransition = (eventEndDate, eventStartDate, startIndex, endIndex) => {
+const adjustEventIndex = (eventEndDate, eventStartDate, startIndex, endIndex) => {
   if (
   eventEndDate.getMonth() > date.getMonth() ||
   eventEndDate.getFullYear() > date.getFullYear()
