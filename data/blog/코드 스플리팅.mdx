@@ -13,7 +13,7 @@ summary: '청크를 분리해서 필요할 때 가져오기'
 ## 라이브러리 코드 스플리팅
 
 ### Vite(Rollup)
-Vite에서는 `Rollup`을 통해 번들링합니다. `vite.config.ts`파일의 `build.rollupOptions.output.manualChunks`를 사용해 청크를 분할하는 방식을 구성할 수 있습니다. 해당 라이브러리가 사용될 때 청크 파일을 불러오고 그 후로는 캐싱하여 사용합니다.
+`Vite`는 프로덕션 환경에서 `Rollup`을 통해 번들링합니다. `vite.config.ts`파일의 `build.rollupOptions.output.manualChunks`를 사용해 청크를 분할하는 방식을 구성할 수 있습니다. 해당 라이브러리가 사용될 때 청크 파일을 불러오고 그 후로는 캐싱하여 사용합니다.
 
 ```ts
 const dependencies = { state: ["zustand"] };
@@ -40,7 +40,7 @@ export default defineConfig({
 
 
 ### Next.js(Webpack)
-Next.js는 `Webpack`을 기반으로 한 자동 코드 스플리팅을 제공하지만 `next.config.js`파일에서 `webpack`설정을 수정하여 특정 라이브러리나 모듈을 별도의 청크로 명시적으로 분리할 수 있습니다.
+`Next.js`는 `Webpack`을 기반으로 한 자동 코드 스플리팅을 제공하지만 `next.config.js`파일에서 `webpack`설정을 수정하여 특정 라이브러리나 모듈을 별도의 청크로 명시적으로 분리할 수 있습니다.
 ```js
 module.exports = {
   webpack: (config, { isServer }) => {
