@@ -1,0 +1,236 @@
+---
+title: '이벤트 루프 동작 100% 예측하기'
+date: '2024-03-29'
+tags: ['자바스크립트']
+summary: '어떤 순서로 동작하는지 실행하기전에 예측해보면 이벤트 루프가 훨씬 쉬워집니다'
+---
+
+이벤트 루프는 자바스크립트의 실행 흐름을 파악하기 위한 중요한 개념입니다. 특히 비동기 작업의 처리 방식과 순서를 파악할 수 있습니다.
+
+본 글에서는 이벤트 루프의 기본 원리를 간략히 소개하고, 코드의 실행 결과를 예측해보는 실습을 통해 이 개념을 보다 깊이 있게 탐구해보고자 합니다.
+
+## 개념
+이벤트 루프를 이해하기 위해서는 기본적으로 네 가지 개념만 파악하고 있으면 충분합니다.
+1. 콜 스택
+2. Web API
+3. 매크로 태스크 큐
+4. 마이크로 태스크 큐
+
+### 콜 스택
+콜 스택은 요청된 작업을 순차적으로 실행하는 역할을 합니다.
+
+### Web API
+비동기 작업(타이머 함수, DOM API 등)은 Web API가 처리를 도와주며, 이러한 작업들이 완료되는 시점에 맞춰 Web API는 매크로 태스크 큐에 해당 작업을 추가합니다.
+
+### 매크로 태스크 큐
+
+매크로태스크 큐는 비동기 작업이 수행해야 할 남은 작업들이 대기하는 곳입니다. 이곳에 있는 작업들은 콜 스택과 마이크로태스크 큐가 모두 비어있을 때만 콜 스택으로 이동하여 실행될 수 있습니다.
+
+### 마이크로 태스크 큐
+비동기 작업 중 일부는 매크로태스크 큐보다 높은 우선순위를 가진 마이크로태스크 큐에 저장됩니다. 이곳에 위치한 작업들은 콜 스택이 비워지는 즉시 콜 스택으로 이동하여 처리됩니다.
+
+## 마이크로 태스크 큐로 들어가는 상황
+마이크로 태스크 큐로 들어가는 상황은 몇 가지 없습니다. 이러한 상황들을 제외하고 발생하는 모든 비동기 작업들은 매크로태스크 큐에 저장됩니다.
+- `async`로 만들어진 함수에서 `await`뒤의 작업
+```js
+async function test(){
+  await console.log('1');
+  console.log('micro 2'); // 마이크로 태스크 큐
+}
+```
+- `Promise`의 `then`, `catch`, `finally` 에서 실행되는 콜백 함수
+```js
+Promise.resolve(1)
+  .then(() => console.log('micro 1')) // 마이크로 태스크 큐
+  .catch(() => console.log('micro 2')) // 마이크로 태스크 큐
+  .finally(() => console.log('micro 3')) // 마이크로 태스크 큐
+```
+- `queueMicrotask`에 들어가는 콜백 함수
+```js
+queueMicrotask(() => console.log('micro 1')); // 마이크로 태스크 큐
+```
+- `MutationObserver`의 생성자 함수
+```js
+new MutationObserver(() => console.log('micro 1')); // 마이크로 태스크 큐
+```
+- `process.nextTick`의 콜백 함수
+```js
+process.nextTick(() => console.log('micro 1')); // 마이크로 태스크 큐
+```
+
+## 동작 순서 예측하기
+이제 개념적인 부분은 알았으니 코드를 보고, 어떤 순서로 동작할지 예측해보면서 이벤트 루프에 대한 이해도를 키워봅시다.
+정답을 보기전에 직접 예측해보는걸 추천합니다.
+
+### 문제 1
+```js
+new Promise(() => console.log(1));
+
+Promise.resolve().then(() => console.log(2))
+  .catch(() => console.log(3))
+  .finally(() => console.log(4));
+
+setTimeout(() => console.log(5), 0);
+
+queueMicrotask(() => console.log(6));
+
+console.log(7);
+```
+
+---
+
+### 동작
+1. `Promise`의 생성자로 들어간 함수는 동기적으로 처리됩니다.
+```
+콘솔 : 1
+콜스택 : [new Promise(), () => console.log(1)]
+매크로 : []
+마이크로 : []
+```
+2. `Promise`를 `reject`하지 않았기 때문에 `then`에 있는 콜백 함수만 마이크로 태스크 큐로 이동합니다.
+```
+콘솔 : 1
+콜스택 : [Promise.reslove(), then()]
+매크로 : []
+마이크로 : [() => console.log(2)]
+```
+3. `setTimeout`의 콜백 함수는 딜레이가 0ms이기 때문에 즉시 매크로 태스크 큐로 이동합니다.
+```
+콘솔 : 1
+콜스택 : [setTimeout()]
+매크로 : [() => console.log(5)]
+마이크로 : [() => console.log(2)]
+```
+4. `queueMicrotask`의 콜백 함수는 마이크로 태스크 큐로 이동합니다.
+```
+콘솔 : 1
+콜스택 : [queueMicrotask()]
+매크로 : [() => console.log(5)]
+마이크로 : [() => console.log(2), () => console.log(6)]
+```
+5. `console.log(7)`이 실행됩니다.
+```
+콘솔 : 1, 7
+콜스택 : [() => console.log(7)]
+매크로 : [() => console.log(5)]
+마이크로 : [() => console.log(2), () => console.log(6)]
+```
+6. `then`의 콜백 함수 `() => console.log(2)`가 실행되고 `finally`의 콜백 함수가 마이크로 태스크 큐로 이동합니다.
+```
+콘솔 : 1, 7, 2
+콜스택 : [finally()]
+매크로 : [() => console.log(5)]
+마이크로 : [() => console.log(6), () => console.log(4)]
+```
+7. `queueMicrotask`의 콜백 함수 `() => console.log(6)`가 실행됩니다.
+```
+콘솔 : 1, 7, 2, 6
+콜스택 : [() => console.log(6)]
+매크로 : [() => console.log(5)]
+마이크로 : [() => console.log(4)]
+```
+7. `finally`의 콜백 함수 `() => console.log(4)`가 실행됩니다.
+```
+콘솔 : 1, 7, 2, 6, 4
+콜스택 : [() => console.log(4)]
+매크로 : [() => console.log(5)]
+마이크로 : []
+```
+7. 마이크로 태스크 큐가 비었으니 이제 매크로 큐의 차례입니다. `setTimeout`의 콜백 함수 `() => console.log(5)`가 실행됩니다.
+```
+콘솔 : 1, 7, 2, 6, 4, 5
+콜스택 : [() => console.log(5)]
+매크로 : []
+마이크로 : []
+```
+### 정답 : 1 7 2 6 4 5
+---
+### 문제 2
+```js
+async function test() {
+  await new Promise((res) => {
+    setTimeout(() => console.log(1), 0);
+    res(1);
+  });
+}
+new Promise((res) => {
+  (async () => {
+    console.log(2);
+    await test();
+    new Promise(() => console.log(3));
+  })();
+  console.log(4);
+  res(1);
+}).then(() => console.log(5));
+```
+### 동작
+1. `Promise`의 생성자 함수에서 비동기 즉시 실행 함수가 실행되고, `console.log(2)`가 실행됩니다.
+```
+콘솔 : 2
+콜스택 : [new Promise((res) => {}), (async () => {}), console.log(2)]
+매크로 : []
+마이크로 : []
+```
+2. `test`함수가 실행되고, `Promise` 생성자 함수가 실행됩니다.
+```
+콘솔 : 2
+콜스택 : [new Promise((res) => {}), (async () => {}), test(), new Promise()]
+매크로 : []
+마이크로 : []
+```
+3. `setTimeout`의 콜백 함수는 딜레이가 0ms이기 때문에 즉시 매크로 태스크 큐로 이동합니다.
+```
+콘솔 : 2
+콜스택 : [new Promise(), (async () => {}), test(), new Promise(), setTimeout()]
+매크로 : [() => console.log(1)]
+마이크로 : []
+```
+4. `Promise` 생성자가 `await` 키워드와 함께 호출되었기 때문에 `test`함수의 남은 부분이 마이크로 태스크 큐로 이동합니다. 여기서 주목해야 할 부분은 실제로 `test`함수는 더이상 실행할 남은 코드가 없지만, `void`를 리턴하는 함수는 암묵적으로 `return undefined`처럼 동작합니다.
+```
+콘솔 : 2
+콜스택 : [new Promise(), (async () => {})]
+매크로 : [() => console.log(1)]
+마이크로 : [test()]
+```
+5. 아직 `await test()`가 끝나지 않았기 때문에 비동기 즉시 실행 함수밖의 `console.log(4)`가 실행됩니다.
+```
+콘솔 : 2 4
+콜스택 : [new Promise(), console.log(4)]
+매크로 : [() => console.log(1)]
+마이크로 : [test()]
+```
+6. `res(1)`이 실행되어 `Promise`가 `resolve`되고 `then`의 콜백 함수가 마이크로 태스크 큐로 이동합니다.
+```
+콘솔 : 2 4
+콜스택 : [new Promise(), then()]
+매크로 : [() => console.log(1)]
+마이크로 : [test(), () => console.log(5)]
+```
+7. 콜 스택이 비어있으니 마이크로 태스크 큐의 항목이 실행됩니다. `test` 함수의 남은 부분이 실행됩니다. 이제 `test`가 완전히 처리됐으니, `await test()` 밑에 있는 비동기 즉시 실행 함수의 남은 부분이 마이크로 태스크 큐로 이동합니다.
+```
+콘솔 : 2 4
+콜스택 : [test()]
+매크로 : [() => console.log(1)]
+마이크로 : [() => console.log(5), (async () => { ... })]
+```
+8. `then`의 콜백 함수 `() => console.log(5)`가 실행됩니다.
+```
+콘솔 : 2 4 5
+콜스택 : [() => console.log(5)]
+매크로 : [() => console.log(1)]
+마이크로 : [(async () => { ... })]
+```
+9. 비동기 즉시 실행 함수의 나머지 부분인 `new Promise(() => console.log(3))`가 실행됩니다.
+```
+콘솔 : 2 4 5 3
+콜스택 : [(async () => { ... }), new Promise(), () => console.log(3)]
+매크로 : [() => console.log(1)]
+마이크로 : []
+```
+10. 마이크로 태스크 큐가 비었으니 이제 매크로 큐의 차례입니다. `setTimeout`의 콜백 함수 `() => console.log(1)`가 실행됩니다.
+```
+콘솔 : 2 4 5 3 1
+콜스택 : [() => console.log(1)]
+매크로 : []
+마이크로 : []
+```
