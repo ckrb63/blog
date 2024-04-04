@@ -51,11 +51,11 @@ const siteMetadata = {
     giscusConfig: {
       // Visit the link below, and follow the steps in the 'configuration' section
       // https://giscus.app/
-      repo: "ckrb63/blog",
-      repositoryId: "R_kgDOLg0n_A",
-      category: "Announcements",
-      categoryId: "DIC_kwDOLg0n_M4CeRLK",
-      mapping: "title", // supported options: pathname, url, title
+      repo: 'ckrb63/blog',
+      repositoryId: 'R_kgDOLg0n_A',
+      category: 'Announcements',
+      categoryId: 'DIC_kwDOLg0n_M4CeRLK',
+      mapping: 'title', // supported options: pathname, url, title
       reactions: '0', // Emoji reactions: 1 = enable / 0 = disable
       // Send discussion metadata periodically to the parent window: 1 = enable / 0 = disable
       metadata: '0',
