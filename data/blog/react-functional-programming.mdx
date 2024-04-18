@@ -1,0 +1,63 @@
+---
+title: 리액트에서의 함수형 프로그래밍
+date: '2024-04-18'
+tags: ['프론트엔드', '리액트', '함수형 프로그래밍']
+draft: false
+summary: 함수형 프로그래밍을 이해하고 실제 프론트엔드 작업에 활용하기 위한 고민
+---
+
+최근에 함수형 프로그래밍에 대한 책을 읽으면서 프론트엔드 개발에 있어 이 패러다임이 어떻게 적용될 수 있는지에 대해 깊이 고민해 보았습니다.
+
+사실, 리액트를 사용하면서 우리는 이미 함수형 프로그래밍의 핵심 원칙 중 하나인 불변성을 지키도록 권장받고 있습니다. 하지만 함수형 프로그래밍은 이런 단편적인 코드들 뿐만 아니라, 컴포넌트 자체에도 적용할 필요가 있습니다. 이상적으로, 리액트 컴포넌트는 순수 함수처럼 설계되어, 동일한 `props`가 주어졌을 때 항상 같은 결과를 렌더링해야 합니다. 하지만 실제 애플리케이션에서는 외부 상태 관리와 상호작용이 필수적이므로, 완전한 순수성을 유지하는 것은 실질적으로 불가능합니다.
+
+## useState와 useEffect의 사용
+
+`useState`와 `useEffect`와 같은 `상태`, `부수효과`를 다루는 훅을 컴포넌트 내부에서 사용한다면 그 컴포넌트는 순수 컴포넌트라고 말할 수 있을까요? 저와 똑같은 궁금증을 가진 많은 개발자들이 이미 해당 논의를 진행중이었습니다.
+
+<a href="https://www.reddit.com/r/reactjs/comments/15xne3o/are_react_function_components_pure_in_terms_of/">
+  Are React function components pure in terms of functional programming?
+</a>
+>It’s not a pure component if it uses state. It doesn’t always return the same output for a given input.
+
+> React components are functional in the sense that for a given set of props and state (and technically context values) a component always returns the same UI.
+
+여러 의견이 있지만 제가 내린 결론은 함수형 프로그래밍 관점에서는 순수 컴포넌트가 아니고, 리액트 관점에서는 순수 컴포넌트로
+취급한다고 생각합니다.
+
+`useState`, `useEffect`를 사용하는 컴포넌트는 함수형 프로그래밍에서 정의하는 순수 함수의 조건을 전부 불만족합니다. 내부적인 상태가 존재하여 같은 **입력 - props**에 다른 **출력 - 렌더링**이 나올 수 있으니 결정론적이지 않습니다. `useEffect`는 네트워크 요청을 포함해 외부 세계와 상호작용할 수 있으니 부수효과가 존재하고 이는 함수형 프로그래밍 입장에선 순수 함수가 아니다라는 결론이 나옵니다.
+반면 리액트 팀에서 정의하는 순수 함수는 함수형 프로그래밍과는 다른 것으로 보입니다. 공식문서를 보면, 리액트는 "Components and Hooks must be pure"라는 아티클에서 모순적이게도 `useState`, `useEffect` 사용을 포함한 컴포넌트의 순수성을 유지하는 방법을 알려줍니다.
+
+> Side effects should not run in render, as React can render components multiple times to create the best possible user experience.
+
+리액트에서 정의하는 순수 컴포넌트의 가이드라인은 다음과 같습니다.
+
+- **Idempotent** – You always get the same result every time you run it with the same inputs – props, state, context for component inputs; and arguments for hook inputs.
+- **Has no side effects in render** – Code with side effects should run separately from rendering. For example as an event handler – where the user interacts with the UI and causes it to update; or as an Effect – which runs after render.
+- **Does not mutate non-local values** - Components and Hooks should never modify values that aren’t created locally in render.
+
+리액트 팀에선 `state`와 `props` 심지어 `context`마저 입력으로 취급하며, 모두 같다면 동일한 JSX를 반환한다고 말합니다.
+또한 렌더링 **이후**에 발생하는 부수효과가 발생하는 것을 허용하고, 이것을 깔끔하게 관리하는 방식으로 `useEffect`를 제공합니다. 즉 리액트에서는 순수함수의 정의를 완화하고 효율적인 형태로 다시 정의했습니다. 실제 어플리케이션을 개발하는 환경과 전통적 함수형 프로그래밍의 순수성 사이의 타협점인 것 같습니다.
+
+## 서버 컴포넌트
+
+함수형 프로그래밍에서 정의하는 순수 함수는 `서버 컴포넌트`의 조건과 동일합니다. 서버 컴포넌트도 컴포넌트 내부에 상태나 부수효과를 가질 수 없습니다. 서버 컴포넌트는 성능적으로도 우수하지만 프로그래밍 패러다임적으로도 현실과 타협하지 않았을 때 선택할 수 있는 가장 이상적인 형태란 뜻입니다. 우리는 가능하면 서버 컴포넌트를 사용해야 하고, 그러기 위해선 가능하면 컴포넌트의 순수성을 유지해야 합니다.
+리액트의 지향점도 결국 함수형 프로그래밍의 지향점과 일치한다는 걸 알 수 있습니다.
+
+## 전역 상태의 사용
+
+`Redux`나 `Zustand`와 같은 전역 상태 관리 라이브러리를 사용하는 것은 코드적으론 함수형 프로그래밍을 활용하지만, 전역 상태에 대한 읽기와 쓰기는 구조적으로 컴포넌트의 순수성을 해칩니다. 컴포넌트 내부에서 전역 상태를 읽고 쓰는 것은 함수에 비유하자면 전역 변수를 사용하는 암묵적 읽기 암묵적 쓰기라고 볼 수 있습니다. 그럼 전역 상태는 전역 변수처럼 사용을 지양해야 하는 것일까요? 꼭 그렇진 않습니다. 우리는 비즈니스 로직을 관리하는 컴포넌트와 props에 맞게 렌더링하는 컴포넌트를 구분해서 사용하면 됩니다. 전역 상태는 비즈니스 로직을 관리하는 컴포넌트에서만 접근하고 렌더링 컴포넌트는 순수성을 유지합니다.
+
+## 왜 적용해야 할까요?
+
+함수형 프로그래밍, 순수 함수를 작성하기 위해서는 노력이 필요합니다. 왜 이런 노력을 해가며 순수성을 분리하고 유지해야 할까요?
+
+- **사이드 이펙트 최소화** - 사이드 이펙트는 개발자가 예측하지 못한 방향으로 작동할 수 있습니다. 코드는 서로 독립적으로 동작하게 됩니다.
+- **서버 컴포넌트** - 순수 함수로 작성된 컴포넌트는 다른 환경(서버)에서 실행할 수 있습니다. 서버 컴포넌트는 번들 크기를 줄이고 사용자에게 더 빨리 렌더링된 요소를 보여줄 수 있습니다.
+- **캐싱** - 순수 컴포넌트는 항상 동일한결과를 반환하므로 캐싱해도 안전합니다.
+- **리렌더링 최적화** - 렌더링 중 데이터가 변경되면 순수 컴포넌트의 경우 즉시 계산을 중단하고 렌더링을 다시 시작할 수 있습니다. 순수 컴포넌트가 아니면 렌더링 완료를 기다려야합니다.
+
+## 고민되는 부분
+
+서버 컴포넌트 사용을 지향하기 위해 컴포넌트 내부에 상태 혹은 상태 변이 함수가 필요하다면 외부로 옮기고 props로 전달하는 패턴을 사용할 수 있지만 이게 좋은 방법인지는 모르겠습니다. 코드의 응집도를 낮추기도 하며, 실제로 이런식으로 개발했을 때 경험이 좋지 않았습니다. `prop drilling`이 발생하여 수정이 필요할 때, 결국 두개 이상의 파일을 오가며 코드를 수정해야 합니다.
+
+아직 어떤 방법이 최적인지는 모르겠습니다. 특히 이것은 애플리케이션의 규모, 팀의 작업 방식, 기능의 복잡성 등 다양한 요소에 따라 변경될 수 있기 때문에 모든 상황에 적용할 수 있는 정답은 없는 것 같기도 합니다. 때로는 순수 함수의 원칙을 완벽하게 적용하는 것보다, 실제 작업 흐름과 유지보수의 용이성을 고려한 유연한 접근 방식이 더 효과적일 수 있습니다.
